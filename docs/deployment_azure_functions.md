@@ -25,7 +25,7 @@ Currently, python is still in preview stage in Azure Functions and fastai only w
 
 ### Software
 
-- Linux (Windows WSL isn't sufficient as fastai won't compile properly.  This guide has been tested with [Ubuntu 18.04](http://releases.ubuntu.com/18.04/))
+- Linux or macOS (Windows WSL isn't sufficient as fastai won't compile properly.  This guide has been tested with [Ubuntu 18.04](http://releases.ubuntu.com/18.04/) and macOS 10.14.5)
 - [Python 3.6](https://www.python.org/downloads/) (only Python runtime currently supported by Azure Functions)
 - [Azure Functions Core Tools version 2.x](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local#v2)
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
@@ -76,7 +76,8 @@ Install fastai and any other dependencies your app needs in the virtual environm
 Then output all the dependencies to requirements.txt which will be used when you build the Docker image.
 
 ```bash
-pip install fastai  # install other dependencies here
+pip install fastai  
+# install other dependencies here
 pip freeze > requirements.txt
 ```
 
@@ -103,19 +104,27 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     learn = load_learner(path)
 
     request_json = req.get_json()
-    r = requests.get(request_json['url'])
+    
+    if 'url' not in request_json:
+    	return func.HttpResponse(f"Not a valid request.")
+    
+    url = request_json['url']
+    if not (url.endswith('jpg') or url.endswith('jpeg') or url.endswith('png')):
+    	return func.HttpResponse(f"Url is not a valid image link, url: {url}")
+    
+    r = requests.get(url)
 
     if r.status_code == 200:
         temp_image_name = "temp.jpg"        
         with open(temp_image_name, 'wb') as f:
             f.write(r.content)
     else:
-        return func.HttpResponse(f"Image download failed, url: {request_json['url']}")
+        return func.HttpResponse(f"Image download failed, url: {url}")
 
     img = open_image(temp_image_name)
     pred_class, pred_idx, outputs = learn.predict(img)
 
-    return func.HttpResponse(f"request_json['url']: {request_json['url']}, pred_class: {pred_class}")
+    return func.HttpResponse(f"request_json['url']: {url}, pred_class: {pred_class}")
 ```
 
 #### \<FUNCTION_NAME>/function.json
